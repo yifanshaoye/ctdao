@@ -1,0 +1,4 @@
+ctdao
+logs/*
+.idea
+go.sum
