@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/yifanshaoye/ctdao/gorm"
+	"github.com/yifanshaoye/ctdao/goredis"
 )
 
 type User struct {
@@ -12,12 +12,20 @@ type User struct {
 
 func main() {
 	fmt.Println("Hello, World !!!")
-	gorm.Done()
-	dsn := "root:long123456@tcp(127.0.0.1:3306)/collections?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.GetMysqlInstance(dsn)
-	fmt.Println("err: ", err)
-	user := []User{{Name: "teng"}, {Name: "chen"}}
-	db.Create(user)
+
+	rcli,_ := goredis.GetRedisInstance("", "", "")
+	res := rcli.Get("a")
+	fmt.Println( res)
+
+	res = rcli.Get("b")
+	fmt.Println( res)
+
+	//gorm.Done()
+	//dsn := "root:long123456@tcp(127.0.0.1:3306)/collections?charset=utf8mb4&parseTime=True&loc=Local"
+	//db, err := gorm.GetMysqlInstance(dsn)
+	//fmt.Println("err: ", err)
+	//user := []User{{Name: "teng"}, {Name: "chen"}}
+	//db.Create(user)
 
 	//zaplog.SetLogFilePath("./database/access.log")
 	//zaplog.InitZaplog()
