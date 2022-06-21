@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-redis/redis"
+	"time"
 )
 
 // dsn: user:password@tcp(ip:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
@@ -18,6 +19,13 @@ func GetRedisInstance(host, port, password string) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:               addr,
 		Password:           password,
+		DB: 0,
+		PoolSize: 500,
+		IdleTimeout: time.Second,
+		IdleCheckFrequency: 10 * time.Second,
+		MinIdleConns: 3,
+		MaxRetries: 2,
+		DialTimeout: 2 * time.Second,
 	})
 
 	for i := 0; i < 3; i++ {

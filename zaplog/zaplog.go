@@ -3,24 +3,34 @@ package zaplog
 import (
 	"errors"
 	"fmt"
+	"github.com/natefinch/lumberjack"
+	"github.com/yifanshaoye/ctdao/utils"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
 	"path/filepath"
 	"time"
 )
 
 type coreLogger struct {
 	logPath string
+	logErrorPath string
 	zaplog *zap.Logger
 
 }
 
+const (
+	accessLog = "/access.log"
+	errorLog = "/error.log"
+)
+
 var logger *coreLogger
 
 func init() {
-	path, _ := filepath.Abs("./logs/logger.log")
+	dirPath := utils.GetLogDir()
+	path, _ := filepath.Abs(dirPath + accessLog)
 	logger = &coreLogger{logPath: path}
+	path, _ = filepath.Abs(dirPath + errorLog)
+	logger.logErrorPath = path
 }
 
 func (lg *coreLogger) initLogger() {
@@ -28,23 +38,59 @@ func (lg *coreLogger) initLogger() {
 	enconf.EncodeTime = func(tm time.Time, enc zapcore.PrimitiveArrayEncoder) {
 		enc.AppendString(tm.Format("2006-01-02 15:04:05.000"))
 	}
-	encoder := zapcore.NewJSONEncoder(enconf)
+	encoder := zapcore.NewConsoleEncoder(enconf)
 
-	fdir := filepath.Dir(lg.logPath)
-	os.MkdirAll(fdir, 0766)
-	file, err := os.OpenFile(lg.logPath, os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		lg.logPath, _= filepath.Abs("./logs/logger.log")
-		fdir := filepath.Dir(lg.logPath)
-		os.MkdirAll(fdir, 0766)
-		file, _ = os.OpenFile(lg.logPath, os.O_WRONLY|os.O_CREATE, 0666)
-	}
-	wrteSyncer := zapcore.AddSync(file)
+	//fdir := filepath.Dir(lg.logPath)
+	//os.MkdirAll(fdir, 0766)
+	//file, err := os.OpenFile(lg.logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	//if err != nil {
+	//	lg.logPath, _= filepath.Abs(accessLogPath)
+	//	fdir := filepath.Dir(lg.logPath)
+	//	os.MkdirAll(fdir, 0766)
+	//	file, _ = os.OpenFile(lg.logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	//}
+	//wrteSyncer := zapcore.AddSync(file)
 
-	core := zapcore.NewCore(encoder, wrteSyncer, zapcore.InfoLevel)
+	accessSyncer := zapcore.AddSync(&lumberjack.Logger{
+		Filename:   lg.logPath,
+		MaxSize:    1000,
+		MaxAge:     7,
+		MaxBackups: 3,
+		LocalTime:  true,
+		Compress:   false,
+	})
+
+	infol := zap.LevelEnablerFunc(func(level zapcore.Level) bool {
+		return level <= zapcore.InfoLevel
+	})
+	coreInfo := zapcore.NewCore(encoder, accessSyncer, infol)
 
 
-	lg.zaplog = zap.New(core, zap.AddCallerSkip(1), zap.AddCaller())
+	//file, err = os.OpenFile(lg.logErrorPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	//if err != nil {
+	//	lg.logErrorPath, _= filepath.Abs(errorLogPath)
+	//	fdir := filepath.Dir(lg.logErrorPath)
+	//	os.MkdirAll(fdir, 0766)
+	//	file, _ = os.OpenFile(lg.logErrorPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	//}
+	//writeSyncer := zapcore.AddSync(file)
+
+	errorSyncer := zapcore.AddSync(&lumberjack.Logger{
+		Filename:   lg.logErrorPath,
+		MaxSize:    1000,
+		MaxAge:     7,
+		MaxBackups: 3,
+		LocalTime:  true,
+		Compress:   false,
+	})
+
+	errorl := zap.LevelEnablerFunc(func(level zapcore.Level) bool {
+		return level > zapcore.InfoLevel
+	})
+
+	coreError := zapcore.NewCore(encoder, errorSyncer, errorl)
+
+	lg.zaplog = zap.New(zapcore.NewTee(coreInfo, coreError), zap.AddCallerSkip(1), zap.AddCaller())
 }
 
 // 初始化zaplog, 在写日志之前必须初始化
@@ -61,6 +107,15 @@ func SetLogFilePath(path string) error {
 		return errors.New("invalie path !!!")
 	}
 	logger.logPath = apath
+	return nil
+}
+
+func SetErrorLogFilePath(path string) error {
+	apath, err := filepath.Abs(path)
+	if err != nil {
+		return errors.New("invalie path !!!")
+	}
+	logger.logErrorPath = apath
 	return nil
 }
 
